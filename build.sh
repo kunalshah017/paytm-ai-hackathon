@@ -11,7 +11,3 @@ cd ..
 cd server
 pip install --upgrade pip
 pip install .
-
-# Install Playwright Chromium browser (without system deps - Render has them)
-export PLAYWRIGHT_BROWSERS_PATH=/opt/render/.cache/ms-playwright
-playwright install chromium
