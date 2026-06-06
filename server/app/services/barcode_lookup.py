@@ -80,6 +80,99 @@ async def _fetch_from_saisupermarket(barcode: str) -> dict | None:
         return None
 
 
+async def _fetch_images_from_bing(query: str) -> list[str]:
+    """Search Bing Images for product photos (fallback)."""
+    try:
+        from urllib.parse import unquote
+
+        async with httpx.AsyncClient(timeout=10) as client:
+            resp = await client.get(
+                "https://www.bing.com/images/async",
+                params={
+                    "q": query,
+                    "first": "0",
+                    "count": "5",
+                    "scenario": "ImageBasicHover",
+                    "datsrc": "I",
+                    "layout": "RowBased",
+                },
+                headers={
+                    "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+                },
+            )
+        if resp.status_code != 200:
+            return []
+
+        murls = re.findall(r'murl&quot;:&quot;(https?://[^&]+)&quot;', resp.text)
+        return [unquote(url) for url in murls[:5]]
+    except Exception:
+        return []
+
+
+async def _fetch_images_from_atozmart(product_name: str, full_name: str = "", barcode: str = "") -> list[str]:
+    """Fetch product images from atozmart.co — by barcode (302 redirect) or name search."""
+    try:
+        async with httpx.AsyncClient(timeout=10, follow_redirects=True) as client:
+            # Try barcode search first — redirects directly to product page
+            if barcode:
+                resp = await client.get(
+                    "https://www.atozmart.co/",
+                    params={"s": barcode, "post_type": "product", "dgwt_wcas": "1"},
+                    headers={"User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36"},
+                )
+                if resp.status_code == 200 and "/product/" in str(resp.url):
+                    soup = BeautifulSoup(resp.text, "lxml")
+                    images: list[str] = []
+                    for img in soup.select(".woocommerce-product-gallery img, .wp-post-image"):
+                        src = img.get("data-large_image") or img.get("data-src") or img.get("src", "")
+                        if src and "atozmart.co" in src:
+                            full_url = re.sub(r"-\d+x\d+(\.\w+)$", r"\1", src)
+                            if full_url not in images:
+                                images.append(full_url)
+                    if images:
+                        return images
+
+            # Fallback: name-based AJAX search
+            resp = await client.get(
+                "https://www.atozmart.co/",
+                params={"wc-ajax": "dgwt_wcas_ajax_search", "s": product_name},
+                headers={
+                    "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36",
+                    "X-Requested-With": "XMLHttpRequest",
+                    "Referer": "https://www.atozmart.co/",
+                },
+            )
+            if resp.status_code != 200:
+                return []
+
+            data = resp.json()
+            suggestions = [s for s in data.get("suggestions", []) if s.get("type") == "product"]
+            if not suggestions:
+                return []
+
+            # Pick best match by weight
+            best = suggestions[0]
+            if full_name and len(suggestions) > 1:
+                weight_match = re.search(r"(\d+)\s*(gm|g|kg|ml|l)", full_name, re.IGNORECASE)
+                if weight_match:
+                    weight = weight_match.group(1)
+                    for s in suggestions:
+                        if weight in s.get("value", ""):
+                            best = s
+                            break
+
+            thumb_html = best.get("thumb_html", "")
+            src_match = re.search(r'src="([^"]+)"', thumb_html)
+            if src_match:
+                thumb_url = src_match.group(1)
+                full_url = re.sub(r"-\d+x\d+(\.\w+)$", r"\1", thumb_url)
+                return [full_url]
+
+        return []
+    except Exception:
+        return []
+
+
 async def lookup_barcode(barcode: str) -> ProductInfo | None:
     # Fetch from both sources
     sai_data = await _fetch_from_saisupermarket(barcode)
@@ -96,8 +189,19 @@ async def lookup_barcode(barcode: str) -> ProductInfo | None:
         or "Unknown Product"
     )
     mrp = (sai_data or {}).get("mrp")
-    images = (off_data or {}).get("images", [])
     attributes = (off_data or {}).get("attributes", {})
+
+    # Get images: atozmart + Bing for product photos, plus Open Food Facts
+    # Strip weight/quantity from name for better search
+    search_name = re.sub(r"\d+\s*(gm|g|kg|ml|l|ltr)\b", "", name, flags=re.IGNORECASE).strip()
+    images = await _fetch_images_from_atozmart(search_name, full_name=name, barcode=barcode)
+    if not images:
+        images = await _fetch_images_from_bing(f"{name} product")
+    # Append Open Food Facts images if available
+    off_images = (off_data or {}).get("images", [])
+    for img in off_images:
+        if img not in images:
+            images.append(img)
 
     return ProductInfo(
         barcode=barcode,
@@ -106,5 +210,4 @@ async def lookup_barcode(barcode: str) -> ProductInfo | None:
         mrp=mrp,
         images=images,
         attributes=attributes,
-        stores=[],
     )

@@ -9,7 +9,6 @@ interface ProductData {
     mrp: string | null;
     images: string[];
     attributes: Record<string, string>;
-    stores: { name: string; price?: string; url: string }[];
 }
 
 export default function ProductDetails() {
@@ -121,30 +120,6 @@ export default function ProductDetails() {
                                 )
                             )}
                         </dl>
-                    </div>
-                )}
-
-                {product.stores.length > 0 && (
-                    <div className="product-stores">
-                        <h2>Available At</h2>
-                        <ul>
-                            {product.stores.map((store, i) => (
-                                <li key={i}>
-                                    <a
-                                        href={store.url}
-                                        target="_blank"
-                                        rel="noopener noreferrer"
-                                    >
-                                        {store.name}
-                                        {store.price && (
-                                            <span className="store-price">
-                                                {store.price}
-                                            </span>
-                                        )}
-                                    </a>
-                                </li>
-                            ))}
-                        </ul>
                     </div>
                 )}
             </div>

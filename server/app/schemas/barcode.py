@@ -8,4 +8,3 @@ class ProductInfo(BaseModel):
     mrp: str | None = None
     images: list[str]
     attributes: dict[str, str]
-    stores: list[dict[str, str]]
