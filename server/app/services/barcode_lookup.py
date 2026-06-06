@@ -84,13 +84,27 @@ async def _fetch_from_saisupermarket(barcode: str) -> dict | None:
 async def _fetch_from_barcodelookup(barcode: str) -> dict | None:
     """Fetch images and attributes from barcodelookup.com using Playwright."""
     try:
+        import os
+        import subprocess
         from playwright.async_api import async_playwright
+
+        # Ensure Chromium is installed at runtime
+        browsers_path = os.environ.get("PLAYWRIGHT_BROWSERS_PATH", "")
+        chrome_path = os.path.join(browsers_path, "chromium-1223/chrome-linux64/chrome") if browsers_path else ""
+
+        if chrome_path and not os.path.exists(chrome_path):
+            # Browsers weren't persisted from build — install now
+            logger.info("Chromium not found, installing...")
+            subprocess.run(["playwright", "install", "chromium"], check=True, capture_output=True)
+
+        executable = chrome_path if chrome_path and os.path.exists(chrome_path) else None
+        logger.info(f"Playwright executable: {executable}, exists: {os.path.exists(chrome_path) if chrome_path else 'N/A'}")
 
         async with async_playwright() as p:
             browser = await p.chromium.launch(
                 headless=True,
-                args=["--disable-blink-features=AutomationControlled", "--no-sandbox", "--headless=new"],
-                executable_path="/opt/render/.cache/ms-playwright/chromium-1223/chrome-linux64/chrome" if __import__("os").path.exists("/opt/render/.cache/ms-playwright/chromium-1223/chrome-linux64/chrome") else None,
+                executable_path=executable,
+                args=["--disable-blink-features=AutomationControlled", "--no-sandbox", "--disable-gpu", "--disable-dev-shm-usage"],
             )
             context = await browser.new_context(
                 user_agent="Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
