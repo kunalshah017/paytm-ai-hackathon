@@ -8,17 +8,17 @@ from typing import AsyncGenerator
 
 def _get_async_url(url: str) -> str:
     """Convert a standard postgresql:// URL to postgresql+asyncpg://"""
-    if url.startswith("postgresql://"):
-        return url.replace("postgresql://", "postgresql+asyncpg://", 1)
-    if url.startswith("postgres://"):
-        return url.replace("postgres://", "postgresql+asyncpg://", 1)
-    return url
+    # Strip query params that asyncpg doesn't understand (sslmode, channel_binding)
+    base = url.split("?")[0]
+    if base.startswith("postgresql://"):
+        return base.replace("postgresql://", "postgresql+asyncpg://", 1)
+    if base.startswith("postgres://"):
+        return base.replace("postgres://", "postgresql+asyncpg://", 1)
+    return base
 
 
-# Supabase requires SSL
+# Neon requires SSL
 _ssl_context = ssl_module.create_default_context()
-_ssl_context.check_hostname = False
-_ssl_context.verify_mode = ssl_module.CERT_NONE
 
 engine = create_async_engine(
     _get_async_url(settings.database_url),
