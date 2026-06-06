@@ -12,5 +12,5 @@ cd server
 pip install --upgrade pip
 pip install .
 
-# Install Playwright Chromium browser
-playwright install --with-deps chromium
+# Install Playwright Chromium browser (without system deps - Render has them)
+playwright install chromium
