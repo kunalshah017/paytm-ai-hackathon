@@ -2,6 +2,51 @@ import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { api } from "@/services/api";
 
+function ImageSlider({ images, alt }: { images: string[]; alt: string }) {
+    const [current, setCurrent] = useState(0);
+
+    if (images.length === 1) {
+        return (
+            <div className="product-images">
+                <img src={images[0]} alt={alt} className="product-main-image" />
+            </div>
+        );
+    }
+
+    return (
+        <div className="product-images">
+            <div className="slider">
+                <button
+                    className="slider-btn slider-prev"
+                    onClick={() => setCurrent((c) => (c - 1 + images.length) % images.length)}
+                >
+                    ‹
+                </button>
+                <img
+                    src={images[current]}
+                    alt={`${alt} ${current + 1}`}
+                    className="product-main-image"
+                />
+                <button
+                    className="slider-btn slider-next"
+                    onClick={() => setCurrent((c) => (c + 1) % images.length)}
+                >
+                    ›
+                </button>
+            </div>
+            <div className="slider-dots">
+                {images.map((_, i) => (
+                    <button
+                        key={i}
+                        className={`slider-dot ${i === current ? "active" : ""}`}
+                        onClick={() => setCurrent(i)}
+                    />
+                ))}
+            </div>
+        </div>
+    );
+}
+
 interface ProductData {
     barcode: string;
     name: string;
@@ -79,13 +124,7 @@ export default function ProductDetails() {
 
             <div className="product-card">
                 {product.images.length > 0 && (
-                    <div className="product-images">
-                        <img
-                            src={product.images[0]}
-                            alt={product.name}
-                            className="product-main-image"
-                        />
-                    </div>
+                    <ImageSlider images={product.images} alt={product.name} />
                 )}
 
                 <h1 className="product-name">{product.name}</h1>
