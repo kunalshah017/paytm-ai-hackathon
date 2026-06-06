@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, useCallback } from "react";
 import { Html5Qrcode } from "html5-qrcode";
 import { useNavigate } from "react-router-dom";
 import { api } from "@/services/api";
+import { playBeep } from "@/utils/beep";
 
 export default function BarcodeScanner() {
     const scannerRef = useRef<Html5Qrcode | null>(null);
@@ -41,7 +42,8 @@ export default function BarcodeScanner() {
         try {
             const { data } = await api.get(`/api/barcode/${decodedText}`);
             if (data && data.name) {
-                // Product found — navigate
+                // Product found — beep and navigate
+                playBeep();
                 stopScanner();
                 navigate(`/product/${decodedText}`);
             }
