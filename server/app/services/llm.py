@@ -1,9 +1,17 @@
 from langchain_openai import ChatOpenAI
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 from langchain_core.messages import HumanMessage, AIMessage
+from langchain_core.tools import tool
 from collections import defaultdict
 
 from app.config import settings
+from app.services.agent_tools import (
+    query_inventory,
+    list_all_inventory,
+    create_order,
+    generate_payment_link,
+    get_order_status,
+)
 
 # ── Conversation history (in-memory) ──────────────────────────────────────────
 _history: dict[str, list] = defaultdict(list)
@@ -90,4 +98,75 @@ prompt = ChatPromptTemplate.from_messages([
     ("human", "{user_input}"),
 ])
 
-chain = prompt | llm
+
+# ── LangChain tools ──────────────────────────────────────────────────────────
+@tool
+async def search_inventory(query: str) -> str:
+    """Search for products or services in the shop inventory by name keyword."""
+    return await query_inventory(query)
+
+
+@tool
+async def show_all_items() -> str:
+    """List all available products and services in the shop."""
+    return await list_all_inventory()
+
+
+@tool
+async def place_order(customer_phone: str, items_json: str, customer_name: str = "") -> str:
+    """Create an order for the customer. items_json must be a JSON array like [{"name": "Parle-G", "quantity": 2}]. Only call after customer confirms."""
+    return await create_order(customer_phone, items_json, customer_name)
+
+
+@tool
+async def create_payment_link(order_id: str, amount: float) -> str:
+    """Generate a Paytm payment link for a confirmed order. Returns the payment URL."""
+    return await generate_payment_link(order_id, amount)
+
+
+@tool
+async def check_order_status(order_id: str) -> str:
+    """Check the current status of an order and its payment status."""
+    return await get_order_status(order_id)
+
+
+tools = [search_inventory, show_all_items, place_order, create_payment_link, check_order_status]
+
+# ── Agent chain with tools ────────────────────────────────────────────────────
+llm_with_tools = llm.bind_tools(tools)
+
+chain = prompt | llm_with_tools
+
+
+async def run_agent(user_input: str, customer_mobile: str) -> str:
+    """Run the agent with tool calling support."""
+    from langchain_core.messages import ToolMessage
+
+    history = get_history(customer_mobile)
+    messages = prompt.format_messages(
+        user_input=user_input,
+        chat_history=history,
+    )
+
+    # Loop until we get a final text response (handle tool calls)
+    max_iterations = 5
+    for _ in range(max_iterations):
+        response = await llm_with_tools.ainvoke(messages)
+        messages.append(response)
+
+        if not response.tool_calls:
+            # Final response with no tool calls
+            return response.content
+
+        # Execute tool calls
+        for tc in response.tool_calls:
+            tool_fn = {t.name: t for t in tools}.get(tc["name"])
+            if tool_fn:
+                tool_result = await tool_fn.ainvoke(tc["args"])
+                messages.append(ToolMessage(
+                    content=str(tool_result),
+                    tool_call_id=tc["id"],
+                ))
+
+    # Fallback if max iterations reached
+    return response.content if response.content else "Processing your request..."

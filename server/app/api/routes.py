@@ -2,7 +2,7 @@ from fastapi import APIRouter, HTTPException, Request, Response
 
 from app.services.barcode_lookup import lookup_barcode
 from app.services.hsn_lookup import search_hsn, get_hsn_for_category
-from app.services.llm import chain, get_history, save_history
+from app.services.llm import run_agent, save_history
 from app.api.inventory import router as inventory_router
 from app.api.orders import router as orders_router
 from app.api.transactions import router as transactions_router
@@ -29,12 +29,7 @@ async def twilio_webhook(request: Request):
         )
 
     try:
-        history = get_history(customer_mobile)
-        ai_response = await chain.ainvoke({
-            "user_input": incoming_msg,
-            "chat_history": history,
-        })
-        reply = ai_response.content
+        reply = await run_agent(incoming_msg, customer_mobile)
         save_history(customer_mobile, incoming_msg, reply)
 
     except Exception as e:

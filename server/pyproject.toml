@@ -17,6 +17,8 @@ dependencies = [
     "asyncpg>=0.31.0",
     "twilio>=9.10.9",
     "langchain-openai>=1.2.2",
+    "paytmchecksum>=1.7.0",
+    "pycryptodome>=3.23.0",
 ]
 
 [dependency-groups]
