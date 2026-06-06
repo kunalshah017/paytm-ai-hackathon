@@ -43,12 +43,29 @@ async def _fetch_from_barcodelookup(barcode: str) -> dict | None:
     try:
         from curl_cffi import requests as cffi_requests
 
-        response = cffi_requests.get(
-            f"{BARCODE_LOOKUP_URL}/{barcode}",
-            impersonate="chrome",
-            timeout=15,
-        )
-        if response.status_code != 200:
+        # Try multiple browser impersonations to bypass Cloudflare
+        impersonations = ["chrome", "chrome110", "chrome120", "safari", "safari15_5", "edge99"]
+        response = None
+        for browser in impersonations:
+            try:
+                response = cffi_requests.get(
+                    f"{BARCODE_LOOKUP_URL}/{barcode}",
+                    impersonate=browser,
+                    timeout=15,
+                    headers={
+                        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+                        "Accept-Language": "en-US,en;q=0.9",
+                        "Accept-Encoding": "gzip, deflate, br",
+                        "Cache-Control": "no-cache",
+                        "Pragma": "no-cache",
+                    },
+                )
+                if response.status_code == 200:
+                    break
+            except Exception:
+                continue
+
+        if not response or response.status_code != 200:
             return None
 
         soup = BeautifulSoup(response.text, "lxml")
