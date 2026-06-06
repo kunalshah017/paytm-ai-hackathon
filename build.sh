@@ -11,3 +11,6 @@ cd ..
 cd server
 pip install --upgrade pip
 pip install .
+
+# Install Playwright Chromium browser
+playwright install --with-deps chromium
