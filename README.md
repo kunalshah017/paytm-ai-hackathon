@@ -13,6 +13,12 @@ An AI-powered WhatsApp shopping assistant for local Indian shopkeepers. Customer
 
 ## 📸 Screenshots
 
+### Barcode Scanner (Mobile)
+
+|                Scanning Parle-G                 |               Auto-filled Details               |             Scanning Knorr Noodles              |               Auto-filled Details               |
+| :---------------------------------------------: | :---------------------------------------------: | :---------------------------------------------: | :---------------------------------------------: |
+| ![Scan 1](docs/screenshots/barcode-scan-1.jpeg) | ![Scan 2](docs/screenshots/barcode-scan-2.jpeg) | ![Scan 3](docs/screenshots/barcode-scan-3.jpeg) | ![Scan 4](docs/screenshots/barcode-scan-4.jpeg) |
+
 ### Dashboard
 
 ![Dashboard](docs/screenshots/dashboard.png)
@@ -28,12 +34,6 @@ An AI-powered WhatsApp shopping assistant for local Indian shopkeepers. Customer
 ### Transactions
 
 ![Transactions](docs/screenshots/transactions.png)
-
-### Barcode Scanner (Mobile)
-
-| Scanning Parle-G | Auto-filled Details | Scanning Knorr Noodles | Auto-filled Details |
-|:-:|:-:|:-:|:-:|
-| ![Scan 1](docs/screenshots/barcode-scan-1.jpeg) | ![Scan 2](docs/screenshots/barcode-scan-2.jpeg) | ![Scan 3](docs/screenshots/barcode-scan-3.jpeg) | ![Scan 4](docs/screenshots/barcode-scan-4.jpeg) |
 
 ### API Documentation
 
