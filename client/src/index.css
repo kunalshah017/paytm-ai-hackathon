@@ -94,6 +94,12 @@ body {
   font-weight: 600;
 }
 
+.scanner-not-found {
+  font-size: 0.8rem;
+  color: #FE9900;
+  font-weight: 600;
+}
+
 /* Manual Entry */
 .manual-entry {
   width: 100%;

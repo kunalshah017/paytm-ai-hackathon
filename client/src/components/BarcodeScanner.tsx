@@ -1,12 +1,19 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useCallback } from "react";
 import { Html5Qrcode } from "html5-qrcode";
 import { useNavigate } from "react-router-dom";
+import { api } from "@/services/api";
 
 export default function BarcodeScanner() {
     const scannerRef = useRef<Html5Qrcode | null>(null);
     const [error, setError] = useState<string>("");
     const [scanning, setScanning] = useState(false);
+    const [checking, setChecking] = useState<string>("");
+    const [notFound, setNotFound] = useState<string>("");
     const navigate = useNavigate();
+
+    // Debounce: track last checked barcode and timestamp
+    const lastCheckedRef = useRef<{ code: string; time: number }>({ code: "", time: 0 });
+    const checkingRef = useRef(false);
 
     useEffect(() => {
         startScanner();
@@ -14,6 +21,39 @@ export default function BarcodeScanner() {
             stopScanner();
         };
     }, []);
+
+    const handleBarcodeScan = useCallback(async (decodedText: string) => {
+        if (!/^\d{8,14}$/.test(decodedText)) return;
+
+        // Debounce: don't re-check the same code within 5 seconds
+        const now = Date.now();
+        const last = lastCheckedRef.current;
+        if (last.code === decodedText && now - last.time < 5000) return;
+
+        // Don't start a new check if one is in progress
+        if (checkingRef.current) return;
+
+        lastCheckedRef.current = { code: decodedText, time: now };
+        checkingRef.current = true;
+        setChecking(decodedText);
+        setNotFound("");
+
+        try {
+            const { data } = await api.get(`/api/barcode/${decodedText}`);
+            if (data && data.name) {
+                // Product found — navigate
+                stopScanner();
+                navigate(`/product/${decodedText}`);
+            }
+        } catch {
+            // Product not found — keep scanning
+            setNotFound(decodedText);
+            setTimeout(() => setNotFound(""), 3000);
+        } finally {
+            checkingRef.current = false;
+            setChecking("");
+        }
+    }, [navigate]);
 
     async function startScanner() {
         try {
@@ -27,11 +67,7 @@ export default function BarcodeScanner() {
                     qrbox: { width: 280, height: 150 },
                 },
                 (decodedText) => {
-                    // Only navigate for numeric barcodes
-                    if (/^\d{8,14}$/.test(decodedText)) {
-                        stopScanner();
-                        navigate(`/product/${decodedText}`);
-                    }
+                    handleBarcodeScan(decodedText);
                 },
                 () => {
                     // ignore scan failures (no barcode in frame)
@@ -78,7 +114,15 @@ export default function BarcodeScanner() {
                 </div>
             )}
 
-            {scanning && (
+            {checking && (
+                <p className="scanner-status">Looking up {checking}...</p>
+            )}
+
+            {notFound && (
+                <p className="scanner-not-found">Product not found for {notFound}, keep scanning...</p>
+            )}
+
+            {scanning && !checking && !notFound && (
                 <p className="scanner-status">Scanning...</p>
             )}
 
