@@ -1,4 +1,4 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Request, Response
 
 from app.services.barcode_lookup import lookup_barcode
 from app.services.hsn_lookup import search_hsn, get_hsn_for_category
@@ -13,6 +13,15 @@ router.include_router(inventory_router)
 router.include_router(orders_router)
 router.include_router(transactions_router)
 router.include_router(upload_router)
+
+
+@router.post("/whatsapp")
+async def twilio_webhook(request: Request):
+    twiml_response = """<?xml version="1.0" encoding="UTF-8"?>
+<Response>
+    <Message>Hello from Paytm AI Hackathon Twilio Webhook!</Message>
+</Response>"""
+    return Response(content=twiml_response, media_type="application/xml")
 
 
 @router.get("/")
