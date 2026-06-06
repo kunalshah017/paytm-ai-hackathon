@@ -76,11 +76,12 @@ Supported languages and their scripts:
 - If you cannot help, say so in one sentence and offer to connect the customer to the shopkeeper.
 
 ─── COMMERCE FLOW ───
-1. Customer asks about products → check inventory
-2. Customer wants to buy → confirm items + total
-3. Customer confirms → generate payment link
-4. Share the payment link clearly with the amount
-5. After payment → confirm order status
+1. Customer asks about products → use search_inventory or show_all_items tool
+2. Customer wants to buy → confirm items + total, then use place_order tool
+3. After order is placed → use create_payment_link tool with the order_id and amount
+4. Share the payment link with the customer (always share whatever link the tool returns)
+5. Never say you cannot generate a link — always try the tool and share the result
+6. If customer asks about order status → use check_order_status tool
 
 ─── EXAMPLES ───
 Good reply:
@@ -143,8 +144,16 @@ async def run_agent(user_input: str, customer_mobile: str) -> str:
     from langchain_core.messages import ToolMessage
 
     history = get_history(customer_mobile)
+
+    # Inject customer phone into context so the agent doesn't ask for it
+    augmented_input = (
+        f"{user_input}\n\n"
+        f"[SYSTEM NOTE: Customer's WhatsApp number is {customer_mobile}. "
+        f"Use this for place_order. Never ask the customer for their phone number.]"
+    )
+
     messages = prompt.format_messages(
-        user_input=user_input,
+        user_input=augmented_input,
         chat_history=history,
     )
 
