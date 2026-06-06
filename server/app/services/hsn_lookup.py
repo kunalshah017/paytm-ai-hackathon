@@ -1,4 +1,5 @@
 import csv
+import re
 from pathlib import Path
 
 _HSN_DATA: list[dict] = []
@@ -96,6 +97,28 @@ CATEGORY_HSN_MAP: dict[str, dict] = {
     "agarbatti": {"hsn": "33074100", "description": "Agarbatti/incense", "gst": 5},
     "incense": {"hsn": "33074100", "description": "Agarbatti/incense", "gst": 5},
     "matchbox": {"hsn": "36050010", "description": "Matches", "gst": 12},
+    # Handwash & Sanitizer
+    "handwash": {"hsn": "34012010", "description": "Liquid soap/handwash", "gst": 18},
+    "hand wash": {"hsn": "34012010", "description": "Liquid soap/handwash", "gst": 18},
+    "sanitizer": {"hsn": "38089400", "description": "Hand sanitizer", "gst": 18},
+    # Common brands → correct HSN
+    "pepsi": {"hsn": "22021010", "description": "Aerated drinks", "gst": 28},
+    "fanta": {"hsn": "22021010", "description": "Aerated drinks", "gst": 28},
+    "sprite": {"hsn": "22021010", "description": "Aerated drinks", "gst": 28},
+    "thumsup": {"hsn": "22021010", "description": "Aerated drinks", "gst": 28},
+    "thums up": {"hsn": "22021010", "description": "Aerated drinks", "gst": 28},
+    "limca": {"hsn": "22021010", "description": "Aerated drinks", "gst": 28},
+    "maaza": {"hsn": "20098910", "description": "Fruit juice/drink", "gst": 12},
+    "frooti": {"hsn": "20098910", "description": "Fruit juice/drink", "gst": 12},
+    "cadbury": {"hsn": "18069010", "description": "Chocolate products", "gst": 18},
+    "dairy milk": {"hsn": "18069010", "description": "Chocolate products", "gst": 18},
+    "kitkat": {"hsn": "18069010", "description": "Chocolate products", "gst": 18},
+    "5 star": {"hsn": "18069010", "description": "Chocolate products", "gst": 18},
+    "bhujia": {"hsn": "21069099", "description": "Namkeen/snacks", "gst": 12},
+    "haldiram": {"hsn": "21069099", "description": "Namkeen/snacks", "gst": 12},
+    "kurkure": {"hsn": "21069099", "description": "Food preparations (snacks)", "gst": 12},
+    "lays": {"hsn": "21069099", "description": "Food preparations (snacks)", "gst": 12},
+    "maggi": {"hsn": "19023010", "description": "Instant noodles", "gst": 18},
 }
 
 
@@ -125,6 +148,8 @@ def search_hsn(query: str, limit: int = 10) -> list[dict]:
     _load_hsn_data()
 
     query_lower = query.lower().strip()
+    if not query_lower:
+        return []
 
     # If query is numeric, search by HSN code prefix
     if query_lower.isdigit():
@@ -134,33 +159,60 @@ def search_hsn(query: str, limit: int = 10) -> list[dict]:
         ]
         return results[:limit]
 
-    # Search by keywords in description
-    keywords = query_lower.split()
-    results = []
+    # Search by keywords in description — score by number of matching keywords
+    keywords = [kw for kw in query_lower.split() if len(kw) > 2]
+    if not keywords:
+        return []
+
+    scored: list[tuple[int, dict]] = []
     for item in _HSN_DATA:
         desc_lower = item["description"].lower()
-        if all(kw in desc_lower for kw in keywords):
-            results.append(item)
-            if len(results) >= limit:
-                break
+        matches = sum(1 for kw in keywords if kw in desc_lower)
+        if matches > 0:
+            scored.append((matches, item))
 
-    return results
+    # Sort by number of keyword matches (descending), return top results
+    scored.sort(key=lambda x: x[0], reverse=True)
+    return [item for _, item in scored[:limit]]
 
 
 def get_hsn_for_category(category: str, product_name: str = "") -> dict | None:
-    """Get HSN code from product category or name using the mapping."""
+    """Get HSN code from product category or name using the mapping + smart DB search."""
     search_text = f"{category} {product_name}".lower()
 
-    # Try longer phrases first (more specific)
+    # Step 1: Try the curated category map (longer/more specific phrases first)
     sorted_keys = sorted(CATEGORY_HSN_MAP.keys(), key=len, reverse=True)
     for key in sorted_keys:
         if key in search_text:
             return CATEGORY_HSN_MAP[key]
 
-    # Fallback: search the full database only if category has meaningful content
-    if category and len(category) > 2:
-        results = search_hsn(category, limit=1)
-        if results:
-            return results[0]
+    # Step 2: Smart search in the full database using product name keywords
+    # Extract meaningful words (skip common noise like brand suffixes, weights, etc.)
+    noise_words = {"the", "and", "for", "with", "pack", "pcs", "nos", "gms", "gm", "ml", "ltr", "kg"}
+    words = re.sub(r"[^a-z\s]", "", search_text).split()
+    keywords = [w for w in words if len(w) > 2 and w not in noise_words]
+
+    if not keywords:
+        return None
+
+    _load_hsn_data()
+
+    # Score each HSN entry by how many product keywords appear in its description
+    best_score = 0
+    best_item = None
+
+    for item in _HSN_DATA:
+        desc_lower = item["description"].lower()
+        score = sum(1 for kw in keywords if kw in desc_lower)
+        # Bonus for longer keyword matches (more specific)
+        if score > 0:
+            score += sum(0.5 for kw in keywords if kw in desc_lower and len(kw) > 4)
+        if score > best_score:
+            best_score = score
+            best_item = item
+
+    # Only return if we have a meaningful match (at least 1 keyword matched)
+    if best_item and best_score >= 1:
+        return best_item
 
     return None
