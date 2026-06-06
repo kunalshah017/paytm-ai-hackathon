@@ -47,11 +47,18 @@ function ImageSlider({ images, alt }: { images: string[]; alt: string }) {
     );
 }
 
+interface HsnData {
+    hsn: string;
+    description: string;
+    gst: number;
+}
+
 interface ProductData {
     barcode: string;
     name: string;
     barcode_format: string;
     mrp: string | null;
+    hsn: HsnData | null;
     images: string[];
     attributes: Record<string, string>;
 }
@@ -133,6 +140,20 @@ export default function ProductDetails() {
                     <div className="product-pricing">
                         <span className="price-label">MRP</span>
                         <span className="price-value">₹{product.mrp}</span>
+                    </div>
+                )}
+
+                {product.hsn && (
+                    <div className="product-hsn">
+                        <div className="hsn-row">
+                            <span className="hsn-label">HSN Code</span>
+                            <span className="hsn-value">{product.hsn.hsn}</span>
+                        </div>
+                        <div className="hsn-row">
+                            <span className="hsn-label">GST Rate</span>
+                            <span className="hsn-gst">{product.hsn.gst}%</span>
+                        </div>
+                        <div className="hsn-desc">{product.hsn.description}</div>
                     </div>
                 )}
 
