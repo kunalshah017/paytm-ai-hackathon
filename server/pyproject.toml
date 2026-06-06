@@ -16,6 +16,7 @@ dependencies = [
     "sqlalchemy[asyncio]>=2.0.50",
     "asyncpg>=0.31.0",
     "twilio>=9.10.9",
+    "langchain-openai>=1.2.2",
 ]
 
 [dependency-groups]
