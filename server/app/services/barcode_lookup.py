@@ -203,11 +203,20 @@ async def lookup_barcode(barcode: str) -> ProductInfo | None:
         if img not in images:
             images.append(img)
 
+    # HSN code lookup from category/product name
+    from app.services.hsn_lookup import get_hsn_for_category
+    from app.schemas.barcode import HsnInfo
+
+    category = attributes.get("Category", "")
+    hsn_data = get_hsn_for_category(category, name)
+    hsn_info = HsnInfo(**hsn_data) if hsn_data else None
+
     return ProductInfo(
         barcode=barcode,
         name=name,
         barcode_format="",
         mrp=mrp,
+        hsn=hsn_info,
         images=images,
         attributes=attributes,
     )

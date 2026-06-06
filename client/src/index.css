@@ -234,7 +234,9 @@ body {
   border: none;
   border-radius: 50%;
   background: var(--surface);
-  box-shadow: 3px 3px 6px var(--shadow-dark), -3px -3px 6px var(--shadow-light);
+  box-shadow:
+    3px 3px 6px var(--shadow-dark),
+    -3px -3px 6px var(--shadow-light);
   font-size: 1.25rem;
   cursor: pointer;
   display: flex;
@@ -245,7 +247,9 @@ body {
 }
 
 .slider-btn:active {
-  box-shadow: inset 2px 2px 4px var(--shadow-dark), inset -2px -2px 4px var(--shadow-light);
+  box-shadow:
+    inset 2px 2px 4px var(--shadow-dark),
+    inset -2px -2px 4px var(--shadow-light);
 }
 
 .slider-dots {
@@ -259,7 +263,9 @@ body {
   border: none;
   border-radius: 50%;
   background: var(--surface);
-  box-shadow: 2px 2px 4px var(--shadow-dark), -2px -2px 4px var(--shadow-light);
+  box-shadow:
+    2px 2px 4px var(--shadow-dark),
+    -2px -2px 4px var(--shadow-light);
   cursor: pointer;
   padding: 0;
 }

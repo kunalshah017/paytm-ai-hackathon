@@ -1,6 +1,7 @@
 from fastapi import APIRouter, HTTPException
 
 from app.services.barcode_lookup import lookup_barcode
+from app.services.hsn_lookup import search_hsn, get_hsn_for_category
 
 router = APIRouter()
 
@@ -20,3 +21,11 @@ async def get_barcode_info(barcode: str):
         raise HTTPException(status_code=404, detail="Product not found")
 
     return product
+
+
+@router.get("/hsn/search")
+async def hsn_search(q: str, limit: int = 10):
+    if not q or len(q) < 2:
+        raise HTTPException(status_code=400, detail="Query must be at least 2 characters")
+    results = search_hsn(q, limit=min(limit, 50))
+    return {"results": results, "total": len(results)}
