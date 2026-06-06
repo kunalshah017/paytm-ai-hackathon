@@ -1,6 +1,7 @@
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 from sqlalchemy.orm import DeclarativeBase, sessionmaker
 from app.config import settings
+from typing import AsyncGenerator
 
 engine = create_async_engine(
     settings.database_url,
@@ -21,7 +22,7 @@ class Base(DeclarativeBase):
     pass
 
 
-async def get_db() -> AsyncSession:
+async def get_db() -> AsyncGenerator[AsyncSession, None, None]:
     """FastAPI dependency that yields a DB session and closes it after the request."""
     async with AsyncSessionLocal() as session:
         try:
@@ -30,5 +31,4 @@ async def get_db() -> AsyncSession:
         except Exception:
             await session.rollback()
             raise
-        finally:
-            await session.close()
+    
