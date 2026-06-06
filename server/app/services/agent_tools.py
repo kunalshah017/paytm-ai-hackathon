@@ -112,7 +112,8 @@ async def generate_payment_link(order_id: str, amount: float) -> str:
     """Generate a payment link for an order. Returns a URL to our payment page."""
     # Generate a link to our hosted payment page
     # The payment page handles Paytm JS Checkout / UPI fallback
-    payment_url = f"/pay/{order_id}"
+    base_url = "https://venue-welding-coast-integration.trycloudflare.com"
+    payment_url = f"{base_url}/pay/{order_id}"
 
     # Save transaction to DB
     async with AsyncSessionLocal() as session:
@@ -128,7 +129,7 @@ async def generate_payment_link(order_id: str, amount: float) -> str:
 
     return (
         f"Payment link generated successfully.\n"
-        f"Link: /pay/{order_id}\n"
+        f"Link: {base_url}/pay/{order_id}\n"
         f"Amount: Rs {amount:.2f}\n"
         f"Send this exact link to the customer. Do NOT wrap it in any formatting like italics or bold."
     )

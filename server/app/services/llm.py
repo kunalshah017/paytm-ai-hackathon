@@ -1,3 +1,10 @@
+import os
+import asyncio
+import tempfile
+import zipfile
+
+import httpx
+from sarvamai import SarvamAI
 from langchain_openai import ChatOpenAI
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 from langchain_core.messages import HumanMessage, AIMessage
@@ -38,6 +45,128 @@ llm = ChatOpenAI(
     temperature=0.3,
 )
 
+# ── Sarvam Vision client ──────────────────────────────────────────────────────
+sarvam_client = SarvamAI(api_subscription_key=settings.sarvam_api_key)
+
+# ── Language detection ────────────────────────────────────────────────────────
+LANG_NAMES = {
+    "hi-IN": "Hindi (Devanagari script)",
+    "bn-IN": "Bengali (Bengali script)",
+    "gu-IN": "Gujarati (Gujarati script)",
+    "kn-IN": "Kannada (Kannada script)",
+    "ml-IN": "Malayalam (Malayalam script)",
+    "mr-IN": "Marathi (Devanagari script)",
+    "od-IN": "Odia (Odia script)",
+    "pa-IN": "Punjabi (Gurmukhi script)",
+    "ta-IN": "Tamil (Tamil script)",
+    "te-IN": "Telugu (Telugu script)",
+    "en-IN": "English (Latin script)",
+}
+
+
+async def detect_language(text: str) -> tuple[str, str]:
+    """
+    Returns (language_code, language_name) e.g. ("hi-IN", "Hindi (Devanagari script)")
+    Falls back to English if detection fails.
+    """
+    try:
+        async with httpx.AsyncClient() as client:
+            resp = await client.post(
+                "https://api.sarvam.ai/text-lid",
+                headers={
+                    "api-subscription-key": settings.sarvam_api_key,
+                    "Content-Type": "application/json",
+                },
+                json={"input": text[:1000]},
+                timeout=5.0,
+            )
+            resp.raise_for_status()
+            data = resp.json()
+            code = data.get("language_code", "en-IN")
+            name = LANG_NAMES.get(code, f"language {code}")
+            return code, name
+    except Exception as e:
+        print(f"[LID error] {e}")
+        return "en-IN", "English (Latin script)"
+
+
+async def build_input(text: str) -> str:
+    """
+    Detects the language of the message and prepends it as a tag so the LLM
+    knows exactly which language and script to reply in.
+    """
+    lang_code, lang_name = await detect_language(text)
+    return f"[DETECTED LANGUAGE: {lang_name}]\n\n{text}"
+
+
+# ── Sarvam Vision — image text extraction ────────────────────────────────────
+async def extract_image_text(media_url: str, media_type: str) -> str:
+    """Download an image from Twilio and extract text using Sarvam Document Intelligence."""
+    # 1. Download image from Twilio
+    async with httpx.AsyncClient() as client:
+        resp = await client.get(
+            media_url,
+            auth=(settings.twilio_account_sid, settings.twilio_auth_token),
+            follow_redirects=True,
+            timeout=15.0,
+        )
+        resp.raise_for_status()
+        image_bytes = resp.content
+
+    # 2. Derive correct file extension from MIME type
+    ext_map = {
+        "image/jpeg": ".jpg",
+        "image/jpg": ".jpg",
+        "image/png": ".png",
+        "image/webp": ".jpg",
+        "application/pdf": ".pdf",
+    }
+    suffix = ext_map.get(media_type.lower(), ".jpg")
+
+    # 3. Save image to temp file with correct extension
+    with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
+        tmp.write(image_bytes)
+        tmp_path = tmp.name
+
+    output_zip_path = tmp_path + "_output.zip"
+
+    def run_sarvam_job() -> str:
+        """
+        All Sarvam SDK calls are synchronous (time.sleep polling internally).
+        Run this entire block in a thread so we don't block the async event loop.
+        """
+        try:
+            job = sarvam_client.document_intelligence.create_job(
+                language="en-IN",
+                output_format="md",
+            )
+            job.upload_file(tmp_path)
+            job.start()
+            status = job.wait_until_complete(timeout=120.0)
+
+            if status.job_state == "Failed":
+                return ""
+
+            job.download_output(output_zip_path)
+
+            with zipfile.ZipFile(output_zip_path) as zf:
+                md_files = [f for f in zf.namelist() if f.endswith(".md")]
+                if not md_files:
+                    return ""
+                return zf.read(md_files[0]).decode("utf-8").strip()
+
+        finally:
+            for path in (tmp_path, output_zip_path):
+                try:
+                    if os.path.exists(path):
+                        os.unlink(path)
+                except Exception as cleanup_err:
+                    print(f"[Vision cleanup warning] {cleanup_err}")
+
+    # 4. Run blocking SDK in a thread — keeps FastAPI's event loop healthy
+    extracted = await asyncio.to_thread(run_sarvam_job)
+    return extracted or "Image received but no readable text was found."
+
 # ── System prompt ─────────────────────────────────────────────────────────────
 SYSTEM_PROMPT = """You are a smart shopping assistant for a local Indian shop, \
 operating over WhatsApp on behalf of the shopkeeper.
@@ -74,6 +203,13 @@ Supported languages and their scripts:
 - If a product is out of stock, suggest the nearest alternative from inventory.
 - Never make up prices or products. Only use what is in the inventory tools.
 - If you cannot help, say so in one sentence and offer to connect the customer to the shopkeeper.
+
+─── WHEN CUSTOMER SENDS AN IMAGE ───
+- You will receive extracted text from Sarvam Vision at the top of the message.
+- If it's a product label → identify the product and check inventory.
+- If it's a handwritten list → read each item and check inventory for each one.
+- If it's an invoice or bill → extract the items and help re-order them.
+- Always confirm what you read from the image before acting on it.
 
 ─── COMMERCE FLOW ───
 1. Customer asks about products → use search_inventory or show_all_items tool
@@ -145,9 +281,10 @@ async def run_agent(user_input: str, customer_mobile: str) -> str:
 
     history = get_history(customer_mobile)
 
-    # Inject customer phone into context so the agent doesn't ask for it
+    # Detect language and inject tag + customer phone context
+    tagged_input = await build_input(user_input)
     augmented_input = (
-        f"{user_input}\n\n"
+        f"{tagged_input}\n\n"
         f"[SYSTEM NOTE: Customer's WhatsApp number is {customer_mobile}. "
         f"Use this for place_order. Never ask the customer for their phone number.]"
     )

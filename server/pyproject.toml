@@ -19,6 +19,7 @@ dependencies = [
     "langchain-openai>=1.2.2",
     "paytmchecksum>=1.7.0",
     "pycryptodome>=3.23.0",
+    "sarvamai>=0.1.28",
 ]
 
 [dependency-groups]
