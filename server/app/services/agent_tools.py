@@ -3,7 +3,6 @@ import uuid
 from datetime import datetime
 
 import httpx
-from paytmchecksum import PaytmChecksum
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 
@@ -110,91 +109,29 @@ async def create_order(customer_phone: str, items_json: str, customer_name: str 
 
 
 async def generate_payment_link(order_id: str, amount: float) -> str:
-    """Generate a Paytm payment link for an order."""
-    mid = settings.paytm_merchant_id
-    mkey = settings.paytm_merchant_key
+    """Generate a payment link for an order. Returns a URL to our payment page."""
+    # Generate a link to our hosted payment page
+    # The payment page handles Paytm JS Checkout / UPI fallback
+    payment_url = f"/pay/{order_id}"
 
-    if not mid or not mkey:
-        return "Error: Paytm credentials not configured."
-
-    paytm_order_id = f"ORD{uuid.uuid4().hex[:12].upper()}"
-
-    base_url = (
-        "https://securegw-stage.paytm.in"
-        if settings.paytm_environment == "staging"
-        else "https://securegw.paytm.in"
-    )
-
-    body = {
-        "requestType": "Payment",
-        "mid": mid,
-        "websiteName": "WEBSTAGING" if settings.paytm_environment == "staging" else "DEFAULT",
-        "orderId": paytm_order_id,
-        "txnAmount": {
-            "value": f"{amount:.2f}",
-            "currency": "INR",
-        },
-        "userInfo": {
-            "custId": order_id[:20],
-        },
-        "callbackUrl": f"{base_url}/theia/paytmCallback?ORDER_ID={paytm_order_id}",
-    }
-
-    signature = PaytmChecksum.generateSignature(json.dumps(body), mkey)
-
-    payload = {
-        "head": {"signature": signature},
-        "body": body,
-    }
-
-    async with httpx.AsyncClient(timeout=15) as client:
-        resp = await client.post(
-            f"{base_url}/theia/api/v1/initiateTransaction?mid={mid}&orderId={paytm_order_id}",
-            json=payload,
-            headers={"Content-Type": "application/json"},
+    # Save transaction to DB
+    async with AsyncSessionLocal() as session:
+        txn = Transaction(
+            order_id=uuid.UUID(order_id),
+            amount=amount,
+            payment_link=payment_url,
+            status="pending",
+            payment_method="paytm",
         )
+        session.add(txn)
+        await session.commit()
 
-    if resp.status_code != 200:
-        return f"Error: Payment gateway returned status {resp.status_code}"
-
-    data = resp.json()
-    result_info = data.get("body", {}).get("resultInfo", {})
-
-    if result_info.get("resultStatus") == "S":
-        txn_token = data["body"]["txnToken"]
-        payment_url = f"{base_url}/theia/api/v1/showPaymentPage?mid={mid}&orderId={paytm_order_id}&txnToken={txn_token}"
-
-        # Save transaction to DB
-        async with AsyncSessionLocal() as session:
-            txn = Transaction(
-                order_id=uuid.UUID(order_id),
-                amount=amount,
-                payment_link=payment_url,
-                status="pending",
-                payment_method="paytm",
-            )
-            session.add(txn)
-            await session.commit()
-
-        return f"Payment link generated: {payment_url}\nAmount: ₹{amount:.2f}\nOrder Reference: {paytm_order_id}"
-    else:
-        # Fallback: generate a direct payment page URL (works for demo)
-        payment_url = f"{base_url}/theia/api/v1/showPaymentPage?mid={mid}&orderId={paytm_order_id}"
-
-        # Save transaction to DB even without token
-        async with AsyncSessionLocal() as session:
-            txn = Transaction(
-                order_id=uuid.UUID(order_id),
-                amount=amount,
-                payment_link=payment_url,
-                status="pending",
-                payment_method="paytm",
-            )
-            session.add(txn)
-            await session.commit()
-
-        error_msg = result_info.get("resultMsg", "Unknown error")
-        return f"Payment link: {payment_url}\nAmount: ₹{amount:.2f}\n_Note: {error_msg}_"
+    return (
+        f"Payment link generated successfully.\n"
+        f"Link: /pay/{order_id}\n"
+        f"Amount: Rs {amount:.2f}\n"
+        f"Send this exact link to the customer. Do NOT wrap it in any formatting like italics or bold."
+    )
 
 
 async def get_order_status(order_id: str) -> str:

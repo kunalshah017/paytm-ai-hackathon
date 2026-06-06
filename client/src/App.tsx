@@ -4,6 +4,7 @@ import Inventory from "./pages/Inventory";
 import AddEditItem from "./pages/AddEditItem";
 import Orders from "./pages/Orders";
 import Transactions from "./pages/Transactions";
+import PaymentPage from "./pages/PaymentPage";
 
 function App() {
     return (
@@ -15,6 +16,7 @@ function App() {
             <Route path="/dashboard/inventory/edit/:itemId" element={<AddEditItem />} />
             <Route path="/dashboard/orders" element={<Orders />} />
             <Route path="/dashboard/transactions" element={<Transactions />} />
+            <Route path="/pay/:orderId" element={<PaymentPage />} />
         </Routes>
     );
 }
