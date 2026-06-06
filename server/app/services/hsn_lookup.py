@@ -81,6 +81,21 @@ CATEGORY_HSN_MAP: dict[str, dict] = {
     "chana": {"hsn": "07132000", "description": "Chickpeas", "gst": 5},
     # Salt
     "salt": {"hsn": "25010010", "description": "Common salt", "gst": 5},
+    # Personal Care
+    "talc": {"hsn": "33049910", "description": "Talcum powder", "gst": 18},
+    "talcum": {"hsn": "33049910", "description": "Talcum powder", "gst": 18},
+    "powder": {"hsn": "33049910", "description": "Face/body powder", "gst": 18},
+    "cream": {"hsn": "33049910", "description": "Face cream/skin care", "gst": 18},
+    "lotion": {"hsn": "33049910", "description": "Body lotion", "gst": 18},
+    "deodorant": {"hsn": "33072000", "description": "Deodorants", "gst": 18},
+    "perfume": {"hsn": "33030010", "description": "Perfume/eau de toilette", "gst": 18},
+    "hair oil": {"hsn": "33059010", "description": "Hair oil", "gst": 18},
+    "face wash": {"hsn": "33049910", "description": "Face wash", "gst": 18},
+    # Household
+    "mosquito": {"hsn": "38089110", "description": "Insecticides (household)", "gst": 18},
+    "agarbatti": {"hsn": "33074100", "description": "Agarbatti/incense", "gst": 5},
+    "incense": {"hsn": "33074100", "description": "Agarbatti/incense", "gst": 5},
+    "matchbox": {"hsn": "36050010", "description": "Matches", "gst": 12},
 }
 
 
@@ -142,9 +157,10 @@ def get_hsn_for_category(category: str, product_name: str = "") -> dict | None:
         if key in search_text:
             return CATEGORY_HSN_MAP[key]
 
-    # Fallback: search the full database
-    results = search_hsn(category, limit=1)
-    if results:
-        return results[0]
+    # Fallback: search the full database only if category has meaningful content
+    if category and len(category) > 2:
+        results = search_hsn(category, limit=1)
+        if results:
+            return results[0]
 
     return None

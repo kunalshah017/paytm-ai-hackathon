@@ -195,8 +195,6 @@ async def lookup_barcode(barcode: str) -> ProductInfo | None:
     # Strip weight/quantity from name for better search
     search_name = re.sub(r"\d+\s*(gm|g|kg|ml|l|ltr)\b", "", name, flags=re.IGNORECASE).strip()
     images = await _fetch_images_from_atozmart(search_name, full_name=name, barcode=barcode)
-    if not images:
-        images = await _fetch_images_from_bing(f"{name} product")
     # Append Open Food Facts images if available
     off_images = (off_data or {}).get("images", [])
     for img in off_images:
