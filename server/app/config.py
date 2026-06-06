@@ -8,6 +8,8 @@ class Settings(BaseSettings):
     cors_origins: list[str] = ["*"]
 
     database_url: str = ""
+    supabase_url: str
+    supabase_service_key: str
 
     twilio_account_sid: str = ""
     twilio_auth_token: str = ""
