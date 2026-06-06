@@ -89,7 +89,8 @@ async def _fetch_from_barcodelookup(barcode: str) -> dict | None:
         async with async_playwright() as p:
             browser = await p.chromium.launch(
                 headless=True,
-                args=["--disable-blink-features=AutomationControlled", "--no-sandbox"],
+                args=["--disable-blink-features=AutomationControlled", "--no-sandbox", "--headless=new"],
+                executable_path="/opt/render/.cache/ms-playwright/chromium-1223/chrome-linux64/chrome" if __import__("os").path.exists("/opt/render/.cache/ms-playwright/chromium-1223/chrome-linux64/chrome") else None,
             )
             context = await browser.new_context(
                 user_agent="Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
