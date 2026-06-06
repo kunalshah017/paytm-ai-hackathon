@@ -18,6 +18,7 @@ This is a monorepo for a hackathon project with two main parts:
 | -------- | ---------------------------------------- |
 | Backend  | Python 3.11+, FastAPI, Uvicorn, uv       |
 | Frontend | React 18, TypeScript, Vite, React Router |
+| Database | PostgreSQL (Supabase), SQLAlchemy async  |
 | API Comm | Axios (client) ↔ REST (server)           |
 
 ## Server (`server/`)
@@ -48,6 +49,22 @@ server/
 - Define request/response models in `app/schemas/`.
 - Use dependency injection via `app/api/deps.py` for shared resources (DB, auth, etc.).
 - Environment variables are managed through `.env` (copy `.env.example`).
+- Database models live in `app/models/` and use SQLAlchemy async with `asyncpg`.
+- Tables are auto-created on startup via `init_db()` in `app/database/database.py`.
+
+### API Routing
+
+- All API routes are prefixed with `/api` (set in `main.py` via `app.include_router(router, prefix="/api")`).
+- Route groups use their own `APIRouter` with a sub-prefix (e.g., `APIRouter(prefix="/inventory")`).
+- FastAPI auto-generates a trailing-slash redirect (307) for routes defined with `/`. **Always use trailing slashes in client API calls** (e.g., `/api/inventory/`, not `/api/inventory`) to avoid unnecessary redirects.
+
+### SPA Serving (Production)
+
+- In production, the server serves the built React client from `client/dist/`.
+- Static assets are mounted at `/assets`.
+- A custom 404 exception handler serves `index.html` for non-API routes (SPA fallback).
+- API 404s return JSON `{"detail": "Not found"}` — the handler explicitly checks `request.url.path.startswith("/api")`.
+- **Never** use a catch-all `/{path:path}` route — it conflicts with the API router.
 
 ### Running
 
@@ -100,6 +117,8 @@ client/
 - One page component per route in `src/pages/`.
 - Reusable UI goes in `src/components/`.
 - All API calls go through the axios instance in `src/services/api.ts`.
+- **Always use trailing slashes** in API paths (e.g., `api.get("/api/inventory/")`) to avoid 307 redirects.
+- Always provide fallback defaults when reading API responses (e.g., `res.data || []`) to handle null/undefined safely.
 - Use `@/` alias for imports from `src/`.
 - Use TypeScript for all source files (`.tsx` for components, `.ts` for logic).
 - The Vite proxy is configured in `vite.config.ts` to forward all `/api/*` requests to `http://localhost:8000`. Server routes should be prefixed with `/api`. No additional CORS configuration is needed in development due to the proxy.

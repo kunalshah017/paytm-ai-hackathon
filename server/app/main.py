@@ -1,17 +1,24 @@
 from pathlib import Path
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
+from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from app.config import settings
 from app.api.routes import router as api_router
+from app.database.database import init_db
 
 app = FastAPI(
     title="Paytm AI Hackathon API",
     version="0.1.0",
 )
+
+
+@app.on_event("startup")
+async def on_startup():
+    await init_db()
 
 app.add_middleware(
     CORSMiddleware,
@@ -20,6 +27,13 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+@app.middleware("http")
+async def add_permissions_policy(request: Request, call_next):
+    response = await call_next(request)
+    response.headers["Permissions-Policy"] = "camera=(*), microphone=(*)"
+    return response
 
 app.include_router(api_router, prefix="/api")
 
@@ -39,9 +53,10 @@ if CLIENT_DIST.exists():
     async def serve_index():
         return FileResponse(CLIENT_DIST / "index.html")
 
-    @app.get("/{full_path:path}")
-    async def serve_spa(full_path: str):
-        file_path = CLIENT_DIST / full_path
-        if file_path.exists() and file_path.is_file():
-            return FileResponse(file_path)
+    @app.exception_handler(404)
+    async def spa_fallback(request: Request, exc: StarletteHTTPException):
+        # Don't serve SPA for API routes — let them return proper JSON errors
+        if request.url.path.startswith("/api"):
+            from fastapi.responses import JSONResponse
+            return JSONResponse({"detail": "Not found"}, status_code=404)
         return FileResponse(CLIENT_DIST / "index.html")

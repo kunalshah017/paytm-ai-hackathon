@@ -9,6 +9,9 @@ class Settings(BaseSettings):
 
     database_url: str = ""
 
+    supabase_url: str = ""
+    supabase_service_key: str = ""
+
     twilio_account_sid: str = ""
     twilio_auth_token: str = ""
     twilio_whatsapp_number: str = ""  # e.g. whatsapp:+14155238886

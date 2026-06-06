@@ -2,8 +2,17 @@ from fastapi import APIRouter, HTTPException
 
 from app.services.barcode_lookup import lookup_barcode
 from app.services.hsn_lookup import search_hsn, get_hsn_for_category
+from app.api.inventory import router as inventory_router
+from app.api.orders import router as orders_router
+from app.api.transactions import router as transactions_router
+from app.api.upload import router as upload_router
 
 router = APIRouter()
+
+router.include_router(inventory_router)
+router.include_router(orders_router)
+router.include_router(transactions_router)
+router.include_router(upload_router)
 
 
 @router.get("/")
