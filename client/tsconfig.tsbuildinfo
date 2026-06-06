@@ -1,0 +1,1 @@
+{"root":["./src/app.tsx","./src/main.tsx","./src/components/barcodescanner.tsx","./src/pages/home.tsx","./src/pages/productdetails.tsx","./src/pages/scan.tsx","./src/services/api.ts","./vite-env.d.ts"],"version":"5.9.3"}

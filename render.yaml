@@ -1,0 +1,16 @@
+services:
+  - type: web
+    name: paytm-ai-hackathon
+    plan: free
+    runtime: python
+    repo: https://github.com/kunalshah017/paytm-ai-hackathon
+    branch: main
+    buildCommand: bash build.sh
+    startCommand: cd server && uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.13"
+      - key: NODE_VERSION
+        value: "20"
+    healthCheckPath: /health
+    autoDeploy: true
