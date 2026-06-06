@@ -1,9 +1,12 @@
+import logging
 import re
 
 import httpx
 from bs4 import BeautifulSoup
 
 from app.schemas.barcode import ProductInfo
+
+logger = logging.getLogger(__name__)
 
 BARCODE_LOOKUP_URL = "https://www.barcodelookup.com"
 SAI_SUPERMARKET_URL = "https://www.saisupermarket.in/product-detail.php"
@@ -163,7 +166,8 @@ async def _fetch_from_barcodelookup(barcode: str) -> dict | None:
             "attributes": attributes,
             "stores": stores,
         }
-    except Exception:
+    except Exception as e:
+        logger.error(f"barcodelookup failed: {type(e).__name__}: {e}")
         return None
 
 
