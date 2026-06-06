@@ -25,7 +25,7 @@ engine = create_async_engine(
     echo=False,
     pool_size=10,
     max_overflow=20,
-    connect_args={"ssl": _ssl_context},
+    connect_args={"ssl": _ssl_context, "timeout": 10},
 )
 
 AsyncSessionLocal = sessionmaker(
@@ -53,7 +53,19 @@ async def get_db() -> AsyncGenerator[AsyncSession, None]:
 
 async def init_db():
     """Create all tables. Called on app startup."""
-    async with engine.begin() as conn:
-        from app.models import inventory_item, order, transaction  # noqa: F401
-        await conn.run_sync(Base.metadata.create_all)
+    import asyncio
+    import logging
+
+    for attempt in range(3):
+        try:
+            async with engine.begin() as conn:
+                from app.models import inventory_item, order, transaction  # noqa: F401
+                await conn.run_sync(Base.metadata.create_all)
+            return
+        except Exception as e:
+            logging.warning(f"Database init attempt {attempt + 1}/3 failed: {e}")
+            if attempt < 2:
+                await asyncio.sleep(2 ** attempt)
+
+    logging.error("Database initialization failed after 3 attempts. App will continue without DB init.")
     
